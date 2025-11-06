@@ -1,28 +1,30 @@
 import axios from "axios";
-import { getToken, clearToken } from "../utils/helper";
+import { getToken, clearAllAuth } from "../utils/helper";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE || "https://alitinvoiceappapi.azurewebsites.net/api",
+  headers: { "Content-Type": "application/json; charset=utf-8" },
   timeout: 55000,
 });
 
 api.interceptors.request.use((config) => {
   const token = getToken();
   if (token) {
-    if (!config.headers) config.headers = {};
+    config.headers = config.headers ?? {};
     config.headers.Authorization = `Bearer ${token}`;
   }
+  // debug: show minimal info
+  console.debug("[api] request", config.method, config.url, !!token ? "auth" : "no-auth");
   return config;
 });
 
 api.interceptors.response.use(
-  (r) => r,
+  (res) => res,
   (err) => {
-    if (err?.response?.status === 401) {
-      // token invalid or expired — clear storage and optionally reload/login
-      clearToken();
-      // Optionally trigger a redirect here if you want global behavior
-      // window.location.href = "/login";
+    const status = err?.response?.status;
+    if (status === 401) {
+      clearAllAuth();
+      window.dispatchEvent(new CustomEvent("auth:loggedOut"));
     }
     return Promise.reject(err);
   }
